@@ -1,7 +1,4 @@
 -- Generated from src/plugin/diffstat.tl by `make`. Do not edit.
-
-
-
 if vim.g.loaded_diffstat then
    return
 end
@@ -18,5 +15,5 @@ vim.api.nvim_create_user_command("GitDiffStat", function(o)
 end, {
    nargs = "*",
    bang = true,
-   desc = "Show line additions/deletions of current changes (git diff --stat); ! refreshes without the float",
+   desc = "Show git diff --stat in a float; ! only refreshes",
 })

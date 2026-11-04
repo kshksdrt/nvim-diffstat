@@ -1,6 +1,3 @@
--- Defines :GitDiffStat. Loading the module waits for the first use, and the
--- background refresh only starts with require("diffstat").setup().
-
 if vim.g.loaded_diffstat then
    return
 end
@@ -17,5 +14,5 @@ vim.api.nvim_create_user_command("GitDiffStat", function(o: vim.CommandArgs)
 end, {
    nargs = "*",
    bang = true,
-   desc = "Show line additions/deletions of current changes (git diff --stat); ! refreshes without the float",
+   desc = "Show git diff --stat in a float; ! only refreshes",
 })

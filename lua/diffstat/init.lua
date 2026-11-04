@@ -1,10 +1,4 @@
 -- Generated from src/lua/diffstat/init.tl by `make`. Do not edit.
-
-
-
-
-
-
 local types = require("diffstat.types")
 local git = require("diffstat.git")
 local view = require("diffstat.view")
@@ -14,8 +8,6 @@ local view = require("diffstat.view")
 local M = {}
 
 local TITLE = "Git Diff Stat"
-
-
 
 local function default_format(s)
    local parts = {}
@@ -41,8 +33,6 @@ local last = nil
 local timer = nil
 local started, applied, inflight = 0, 0, 0
 
-
-
 local function start_dir()
    local name = vim.api.nvim_buf_get_name(0)
    if vim.api.nvim_get_option_value("buftype", { buf = 0 }) == "" and name ~= "" then
@@ -54,12 +44,9 @@ local function start_dir()
    return vim.fn.getcwd()
 end
 
-
-
 function M.get()
    return last
 end
-
 
 function M.statusline()
    if not last then
@@ -69,14 +56,13 @@ function M.statusline()
    return ok and text or ""
 end
 
-
-
 function M.refresh(args, cb)
    started = started + 1
    inflight = inflight + 1
    local seq = started
    git.stat(start_dir(), args or config.args, config.untracked, function(stat, err)
       inflight = inflight - 1
+
 
       if seq > applied and not err then
          applied = seq
@@ -107,7 +93,6 @@ local function report(stat, err)
    return false
 end
 
-
 function M.show(args)
    M.refresh(args, function(stat, err)
       if report(stat, err) then
@@ -116,14 +101,11 @@ function M.show(args)
    end)
 end
 
-
 function M.refresh_verbose(args)
    M.refresh(args, function(stat, err)
       report(stat, err)
    end)
 end
-
-
 
 function M.start()
    if timer or config.interval_ms <= 0 then
@@ -147,7 +129,6 @@ function M.stop()
       timer = nil
    end
 end
-
 
 function M.setup(opts)
    config = vim.tbl_deep_extend("force", defaults, opts or {})

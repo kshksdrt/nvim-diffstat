@@ -1,6 +1,3 @@
--- Renders a types.Stat as `git diff --stat`-style rows in a float.
--- render() is pure (lines + highlight spans) so it can be tested headless.
-
 local types = require("diffstat.types")
 local type Stat = types.Stat
 local type FloatConfig = types.FloatConfig
@@ -8,7 +5,7 @@ local type FloatConfig = types.FloatConfig
 local record M
    record Span
       row: integer -- 0-based
-      col: integer -- byte offsets, end exclusive
+      col: integer -- bytes, end exclusive
       end_col: integer
       group: string
    end
@@ -23,7 +20,7 @@ local function width(s: string): integer
    return vim.fn.strdisplaywidth(s)
 end
 
---- Shorten `name` to `w` cells, keeping the end like git does (`.../x.lua`).
+-- Keeps the end, like git: `.../x.lua`.
 local function fit(name: string, w: integer): string
    if width(name) <= w then
       return name
@@ -35,8 +32,7 @@ local function fit(name: string, w: integer): string
    return "..." .. tail
 end
 
---- Bar length for `n` changes when the largest file has `max` and the bar may
---- use `w` cells. Same formula as git's scale_linear: never 0 for n > 0.
+-- git's scale_linear: never 0 for n > 0.
 local function scale(n: integer, max: integer, w: integer): integer
    if n == 0 or max <= w then
       return n
@@ -48,7 +44,6 @@ local function plural(n: integer, one: string, many: string): string
    return tostring(n) .. " " .. (n == 1 and one or many)
 end
 
---- Lines and highlight spans for `stat`, at most `max_width` cells wide.
 function M.render(stat: Stat, max_width: integer): {string}, {Span}
    local lines: {string} = {}
    local spans: {Span} = {}
@@ -61,7 +56,7 @@ function M.render(stat: Stat, max_width: integer): {string}, {Span}
       count_w = math.max(count_w, #tostring(f.added + f.removed))
       max_change = math.max(max_change, f.added + f.removed)
    end
-   -- Row layout: " " name " | " count " " bar
+   -- " " name " | " count " " bar
    local fixed = 1 + 3 + count_w + 1
    name_w = math.max(4, math.min(name_w, max_width - fixed - MIN_BAR))
    local bar_w = math.max(1, max_width - fixed - name_w)
@@ -115,7 +110,6 @@ function M.render(stat: Stat, max_width: integer): {string}, {Span}
    return lines, spans
 end
 
---- Show `stat` in a centered float; `q` / `<Esc>` close it.
 function M.open(stat: Stat, cfg: FloatConfig)
    local max_width = math.min(cfg.max_width, vim.o.columns - 4)
    local lines, spans = M.render(stat, max_width)
@@ -127,7 +121,7 @@ function M.open(stat: Stat, cfg: FloatConfig)
    w = math.min(w, max_width)
    local h = math.min(#lines, vim.o.lines - 4)
 
-   -- Per open, not at load: `:colorscheme` clears default links.
+   -- Set per open: `:colorscheme` clears default links.
    vim.api.nvim_set_hl(0, "DiffStatAdded", { link = "Added", default = true })
    vim.api.nvim_set_hl(0, "DiffStatRemoved", { link = "Removed", default = true })
 

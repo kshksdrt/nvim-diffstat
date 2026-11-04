@@ -1,19 +1,11 @@
--- Compile every src/**/*.tl to the same path at the repo root (src/lua/x.tl ->
--- lua/x.lua, src/plugin/x.tl -> plugin/x.lua). Run from the repo root via
--- `make`, which fetches the pinned compiler into .tools/ first.
---
---   nvim -l scripts/build.lua [--check]
---
--- --check type-checks only and writes nothing. Warnings fail the build, so
--- the committed Lua always comes from warning-free Teal.
+-- Compiles src/X.tl to X.lua. Run via `make`. --check only type-checks.
+-- Warnings fail the build.
 
 local check_only = arg[1] == '--check'
 
 package.path = './.tools/?.lua;' .. package.path
 local tl = require 'tl'
 
--- Where `require` inside Teal sources resolves: our own modules, then the
--- hand-written declarations in types/ (e.g. types/vim.d.tl).
 tl.path = './src/lua/?.tl;./src/lua/?/init.tl;./types/?.d.tl'
 
 local function list_sources()
@@ -35,8 +27,6 @@ end
 
 local failed = 0
 for _, src in ipairs(list_sources()) do
-  -- A fresh env per file keeps each check independent; `vim` is predefined so
-  -- the global from types/vim.d.tl is visible everywhere.
   local env = assert(tl.new_env {
     defaults = { feat_lax = 'off', gen_target = '5.1', gen_compat = 'off' },
     predefined_modules = { 'vim' },
@@ -46,7 +36,6 @@ for _, src in ipairs(list_sources()) do
     io.stderr:write(err .. '\n')
     failed = failed + 1
   else
-    -- Report everything the env loaded (the file plus anything it required).
     local n = 0
     for _, name in ipairs(env.loaded_order) do
       local r = env.loaded[name]
@@ -73,8 +62,7 @@ for _, src in ipairs(list_sources()) do
   end
 end
 
--- Delete outputs whose source is gone, so a rename can't leave a stale module
--- behind. Only files carrying our header are touched.
+-- Remove generated files whose source is gone.
 if not check_only and failed == 0 then
   local sources = {}
   for _, src in ipairs(list_sources()) do

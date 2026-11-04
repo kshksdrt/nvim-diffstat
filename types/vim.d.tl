@@ -1,7 +1,4 @@
--- Minimal type declarations for the parts of the Neovim Lua API this plugin
--- uses. Not a complete `vim` definition: add fields here as the source needs
--- them, typed after `:h lua-guide` / `:h api`. Loaded as a predefined module
--- by scripts/build.lua, so every source file sees the `vim` global.
+-- Only the parts of the Neovim API this plugin uses.
 
 global record vim
    record SystemCompleted

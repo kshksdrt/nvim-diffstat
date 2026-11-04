@@ -1,13 +1,8 @@
-# The Teal sources in src/ compile to lua/ and plugin/, which are committed
-# so the plugin needs no build step to install. `make verify` (run in CI)
-# fails when the committed Lua doesn't match a fresh build.
-
-# Not $(NVIM): inside a :terminal that is the server socket, not a binary.
+# Not $(NVIM): inside :terminal that is the server socket.
 NVIM_BIN  ?= nvim
 SHA256SUM ?= sha256sum
 
-# Pinned compiler, fetched on first build. To upgrade, change both lines and
-# delete .tools/; tl.lua is a single self-contained file.
+# To upgrade, change both lines and delete .tools/.
 TL_VERSION := v0.24.8
 TL_SHA256  := ddb28d177f057ebe4face7aa69d92e9f8ad9bd17004fa88c53ec9370f1862c29
 TL         := .tools/tl.lua
@@ -17,7 +12,6 @@ TL         := .tools/tl.lua
 build: $(TL)
 	$(NVIM_BIN) -l scripts/build.lua
 
-# Type-check without writing anything.
 check: $(TL)
 	$(NVIM_BIN) -l scripts/build.lua --check
 

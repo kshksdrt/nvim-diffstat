@@ -1,10 +1,7 @@
 -- Generated from src/lua/diffstat/types.tl by `make`. Do not edit.
 
 
-
 local M = { FileStat = {}, Stat = {}, FloatConfig = {}, Config = {} }
-
-
 
 
 

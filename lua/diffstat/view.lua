@@ -1,7 +1,4 @@
 -- Generated from src/lua/diffstat/view.tl by `make`. Do not edit.
-
-
-
 local types = require("diffstat.types")
 
 
@@ -37,7 +34,6 @@ local function fit(name, w)
 end
 
 
-
 local function scale(n, max, w)
    if n == 0 or max <= w then
       return n
@@ -48,7 +44,6 @@ end
 local function plural(n, one, many)
    return tostring(n) .. " " .. (n == 1 and one or many)
 end
-
 
 function M.render(stat, max_width)
    local lines = {}
@@ -115,7 +110,6 @@ function M.render(stat, max_width)
 
    return lines, spans
 end
-
 
 function M.open(stat, cfg)
    local max_width = math.min(cfg.max_width, vim.o.columns - 4)

@@ -1,21 +1,16 @@
--- Runs git asynchronously and turns its output into a types.Stat.
--- Nothing here touches editor state, so callers decide what a result means.
-
 local types = require("diffstat.types")
 local type FileStat = types.FileStat
 local type Stat = types.Stat
 
 local record M end
 
--- What HEAD is compared against before the first commit, per object format
--- (`git hash-object -t tree --stdin </dev/null`).
+-- Compared against before the first commit.
 local EMPTY_TREE: {string:string} = {
    sha1 = "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
    sha256 = "6ef19b41225c5369f1c104d45d8d85efa9b057b53b14b4b9b939dd74decc5321",
 }
 
--- Without this, `git diff` takes index.lock to refresh stat info, and a
--- background run could make the user's own `git commit` fail.
+-- Don't take index.lock, so a background run can't break the user's own git commands.
 local GIT_ENV: {string:string} = { GIT_OPTIONAL_LOCKS = "0" }
 
 local function git(dir: string, args: {string}, on_exit: function(vim.SystemCompleted))
@@ -23,16 +18,15 @@ local function git(dir: string, args: {string}, on_exit: function(vim.SystemComp
    for _, a in ipairs(args) do
       cmd[#cmd + 1] = a
    end
-   -- vim.system throws (rather than calling back) when git can't be spawned.
+   -- vim.system throws instead of calling back when git can't be spawned.
    local ok, err = pcall(vim.system, cmd, { text = true, env = GIT_ENV }, on_exit)
    if not ok then
       on_exit({ code = -1, signal = 0, stdout = "", stderr = tostring(err) })
    end
 end
 
---- Parse `git diff --numstat -z`. Each entry is `added\tremoved\tpath\0`,
---- or `added\tremoved\t\0old\0new\0` for a rename/copy; binary files report
---- `-` for both counts.
+-- Entries are `added\tremoved\tpath\0`, or `added\tremoved\t\0old\0new\0` for
+-- renames. Binary files report `-` for both counts.
 function M.parse_numstat(out: string): {FileStat}
    local files: {FileStat} = {}
    local tokens = vim.split(out, "\0", { plain = true })
@@ -56,18 +50,14 @@ function M.parse_numstat(out: string): {FileStat}
    return files
 end
 
---- Compute the stat for the repository containing `dir`.
---- `args` are passed to `git diff`; empty means HEAD vs the working tree,
---- which also lists untracked files when `with_untracked` is set.
---- `cb` runs on the main loop with (stat, nil) on success, (nil, nil) when
---- `dir` is not inside a repository, and (nil, message) when git fails.
+-- cb runs on the main loop: (stat, nil) on success, (nil, nil) outside a
+-- repository, (nil, message) when git fails.
 function M.stat(dir: string, args: {string}, with_untracked: boolean, cb: function(Stat, string))
    local function finish(stat: Stat, err: string)
       vim.schedule(function() cb(stat, err) end)
    end
 
-   -- One call for the top level, the object format and HEAD (absent before
-   -- the first commit, in which case rev-parse exits 1 after the first two).
+   -- Before the first commit there is no HEAD line and rev-parse exits 1.
    git(dir, { "rev-parse", "--show-toplevel", "--show-object-format", "--verify", "-q", "HEAD" }, function(res: vim.SystemCompleted)
       local info = vim.split(res.stdout or "", "\n", { trimempty = true })
       if #info < 2 then

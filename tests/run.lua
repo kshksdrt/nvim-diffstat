@@ -1,5 +1,4 @@
--- Headless tests: `make test` (nvim -l tests/run.lua from the repo root).
--- Exercises the committed Lua in lua/ and plugin/ against throwaway repos.
+-- Run with `make test`.
 
 vim.opt.rtp:prepend '.'
 vim.cmd.runtime 'plugin/diffstat.lua'

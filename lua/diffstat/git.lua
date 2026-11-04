@@ -1,7 +1,4 @@
 -- Generated from src/lua/diffstat/git.tl by `make`. Do not edit.
-
-
-
 local types = require("diffstat.types")
 
 
@@ -9,12 +6,10 @@ local types = require("diffstat.types")
 local M = {}
 
 
-
 local EMPTY_TREE = {
    sha1 = "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
    sha256 = "6ef19b41225c5369f1c104d45d8d85efa9b057b53b14b4b9b939dd74decc5321",
 }
-
 
 
 local GIT_ENV = { GIT_OPTIONAL_LOCKS = "0" }
@@ -30,7 +25,6 @@ local function git(dir, args, on_exit)
       on_exit({ code = -1, signal = 0, stdout = "", stderr = tostring(err) })
    end
 end
-
 
 
 
@@ -59,14 +53,10 @@ end
 
 
 
-
-
-
 function M.stat(dir, args, with_untracked, cb)
    local function finish(stat, err)
       vim.schedule(function() cb(stat, err) end)
    end
-
 
 
    git(dir, { "rev-parse", "--show-toplevel", "--show-object-format", "--verify", "-q", "HEAD" }, function(res)
