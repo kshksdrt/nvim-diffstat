@@ -1,0 +1,158 @@
+*diffstat.txt*  Line counts of your git changes, for floats and statuslines
+
+==============================================================================
+CONTENTS                                                            *diffstat*
+
+  1. Overview ..................................... |diffstat-overview|
+  2. Setup ........................................ |diffstat-setup|
+  3. Command ...................................... |:GitDiffStat|
+  4. Lua API ...................................... |diffstat-api|
+  5. Statusline ................................... |diffstat-statusline|
+  6. Event ........................................ |DiffStatUpdated|
+
+Requires Neovim 0.10+ and git.
+
+==============================================================================
+1. OVERVIEW                                                *diffstat-overview*
+
+diffstat runs `git diff --numstat` in the background every few seconds and on
+demand. The most recent result, from either source, is stored and exposed
+through |diffstat.get()| and |diffstat.statusline()|.
+
+The repository is the one containing the current buffer's file (or the
+current directory for special and unnamed buffers), resolved again on every
+refresh. There is a single stored result, not one per repository.
+
+By default the working tree is compared to HEAD (staged and unstaged changes
+together), and untracked files are listed separately because `git diff`
+ignores them. Before the first commit, the comparison is against the empty
+tree.
+
+Background refreshes run git with GIT_OPTIONAL_LOCKS=0, so they never hold
+index.lock while you run git yourself.
+
+==============================================================================
+2. SETUP                                                      *diffstat-setup*
+
+The command works without setup. The background refresh starts with:
+>lua
+    require('diffstat').setup {
+      -- Background refresh period. 0 disables it (manual refreshes only).
+      interval_ms = 10000,
+      -- Default `git diff` arguments. Empty means HEAD vs the working tree.
+      args = {},
+      -- List untracked files when comparing against HEAD.
+      untracked = true,
+      -- Statusline text for a |diffstat-stat|. The default returns
+      -- "+12 -3", plus " ?2" when there are untracked files, or "".
+      format = nil,
+      float = { border = 'rounded', max_width = 120 },
+    }
+<
+Calling setup() again replaces the configuration and restarts the timer.
+
+==============================================================================
+3. COMMAND                                                      *:GitDiffStat*
+
+:GitDiffStat [args]     Refresh, then show the result in a float like
+                        `git diff --stat`. `q` or <Esc> closes it. [args]
+                        replace HEAD in the comparison, for example:
+>vim
+    :GitDiffStat --staged        " staged changes only
+    :GitDiffStat main...HEAD     " the whole branch against main
+<
+                        Untracked files are listed only without [args].
+
+:GitDiffStat! [args]    Refresh without the float. Errors still show up
+                        as notifications.
+
+The float's buffer has 'filetype' "diffstat". The bar is drawn with the
+highlight groups `DiffStatAdded` and `DiffStatRemoved`, which link to `Added`
+and `Removed` by default.
+
+There is no default mapping. For example:
+>lua
+    vim.keymap.set('n', '<leader>hc', '<Cmd>GitDiffStat<CR>')
+<
+==============================================================================
+4. LUA API                                                      *diffstat-api*
+
+All functions are on `require('diffstat')`.
+
+setup({opts})                                               *diffstat.setup()*
+    See |diffstat-setup|.
+
+get()                                                         *diffstat.get()*
+    Returns the last |diffstat-stat|, or nil before the first refresh and
+    after a refresh outside a repository. The table is shared with the
+    plugin, so don't modify it.
+
+statusline()                                           *diffstat.statusline()*
+    Returns `format(get())`, or "" when there is no result or `format`
+    raises an error.
+
+refresh({args}, {cb})                                     *diffstat.refresh()*
+    Refreshes now, asynchronously. {args} defaults to `args` from setup().
+    {cb}, if given, is called as `cb(stat, err)` with this call's own result:
+    a stat on success, (nil, nil) outside a repository, and (nil, message)
+    when git fails. A failed refresh keeps the previous result. A refresh
+    that finishes after a newer one has already landed doesn't replace it.
+
+show({args})                                                 *diffstat.show()*
+    The Lua version of |:GitDiffStat|.
+
+start()                                                     *diffstat.start()*
+stop()                                                       *diffstat.stop()*
+    Start or stop the background refresh. start() also refreshes right away.
+    A tick is skipped while a previous refresh is still running.
+
+                                                               *diffstat-stat*
+A stat is a table with these fields:
+
+    root        string      Repository top level.
+    args        string[]    `git diff` arguments used. Empty means HEAD.
+    files       FileStat[]  One per changed file.
+    added       integer     Total lines added.
+    removed     integer     Total lines removed.
+    untracked   string[]    Untracked paths. Empty when args were given.
+    updated_at  integer     os.time() when the result landed.
+
+FileStat fields: `path`, `old_path` (renames and copies only), `added`,
+`removed`, `binary` (counts are 0 for binary files). Paths are relative to
+`root`.
+
+==============================================================================
+5. STATUSLINE                                            *diffstat-statusline*
+
+The statusline is redrawn whenever |diffstat.statusline()|'s text changes.
+
+Native 'statusline':
+>lua
+    vim.o.statusline = "%f %{v:lua.require'diffstat'.statusline()} %=%l:%c"
+<
+lualine:
+>lua
+    sections = { lualine_x = { function() return require('diffstat').statusline() end } }
+<
+Your own format, using every field:
+>lua
+    require('diffstat').setup {
+      format = function(s)
+        if #s.files == 0 then return '' end
+        return ('%d files +%d -%d'):format(#s.files, s.added, s.removed)
+      end,
+    }
+<
+==============================================================================
+6. EVENT                                                     *DiffStatUpdated*
+
+`User DiffStatUpdated` fires after every refresh that replaces the stored
+result. The autocommand's `data` is the new |diffstat-stat|, or nil when the
+refresh ran outside a repository.
+>lua
+    vim.api.nvim_create_autocmd('User', {
+      pattern = 'DiffStatUpdated',
+      callback = function(ev) print(ev.data and ev.data.added) end,
+    })
+<
+ vim:tw=78:ts=8:ft=help:norl:
