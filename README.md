@@ -28,6 +28,7 @@ Requires Neovim 0.10+.
   untracked = true,
   format = nil,        -- function(stat): string
   float = { border = 'rounded', max_width = 120 },
+  dir = nil,           -- function(): string; nil follows the buffer, vim.fn.getcwd the cwd
 }
 ```
 

@@ -30,6 +30,7 @@ local record M
       untracked: boolean
       format: function(Stat): string
       float: FloatConfig
+      dir: function(): string -- nil follows the current buffer
    end
 end
 

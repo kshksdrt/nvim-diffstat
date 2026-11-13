@@ -47,6 +47,10 @@ The command works without setup. The background refresh starts with:
       -- "+12 -3", plus " ?2" when there are untracked files, or "".
       format = nil,
       float = { border = 'rounded', max_width = 120 },
+      -- Function returning the directory git runs in. nil uses the current
+      -- buffer's directory, falling back to the cwd. `vim.fn.getcwd` always
+      -- uses the cwd.
+      dir = nil,
     }
 <
 Calling setup() again replaces the configuration and restarts the timer.

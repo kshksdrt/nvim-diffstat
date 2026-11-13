@@ -160,6 +160,17 @@ test('refresh: outside a repository clears the result', function()
   eq('', diffstat.statusline())
 end)
 
+test('dir: follows the buffer by default, or runs where dir() says', function()
+  local plain = tmp .. '/plain'
+  vim.fn.mkdir(plain, 'p')
+  vim.cmd.edit(plain .. '/notes.txt')
+  eq(nil, (refresh_in(r)), 'buffer outside a repo, cwd inside one')
+  diffstat.setup { interval_ms = 0, dir = vim.fn.getcwd }
+  eq(vim.fn.resolve(r), vim.fn.resolve((refresh_in(r)).root), 'dir = getcwd')
+  diffstat.setup { interval_ms = 0 }
+  vim.cmd 'bwipeout!'
+end)
+
 test('background refresh picks up new changes', function()
   vim.cmd.cd(r)
   diffstat.setup { interval_ms = 100, format = function(s)

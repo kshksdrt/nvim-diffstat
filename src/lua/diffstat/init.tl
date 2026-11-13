@@ -25,6 +25,7 @@ local defaults: Config = {
    untracked = true,
    format = default_format,
    float = { border = "rounded", max_width = 120 },
+   dir = nil,
 }
 
 local config: Config = defaults
@@ -33,6 +34,9 @@ local timer: vim.Timer = nil
 local started, applied, inflight = 0, 0, 0
 
 local function start_dir(): string
+   if config.dir then
+      return config.dir()
+   end
    local name = vim.api.nvim_buf_get_name(0)
    if vim.api.nvim_get_option_value("buftype", { buf = 0 }) == "" and name ~= "" then
       local dir = vim.fs.dirname(name)
