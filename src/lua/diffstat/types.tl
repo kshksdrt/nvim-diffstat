@@ -11,11 +11,12 @@ local record M
 
    record Stat
       root: string
+      branch: string -- short commit id when detached
       args: {string} -- empty means HEAD
       files: {FileStat}
       added: integer
       removed: integer
-      untracked: {string} -- only filled when args is empty
+      untracked: {FileStat} -- only filled when args is empty; counted in added
       updated_at: integer
    end
 

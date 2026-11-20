@@ -1,6 +1,6 @@
 # nvim-diffstat
 
-`git diff --stat` for Neovim: in a float on demand, and refreshed in the background for your statusline.
+`git diff --stat` for Neovim, untracked files included: in a float on demand, and refreshed in the background for your statusline.
 
 Requires Neovim 0.10+.
 
@@ -15,7 +15,7 @@ Requires Neovim 0.10+.
 
 - `:GitDiffStat [args]` shows the stat in a float. `args` replace `HEAD`, e.g. `--staged`, `main...HEAD`.
 - `:GitDiffStat!` refreshes without the float.
-- `require('diffstat').statusline()` returns `+12 -3 ?2` for the last refresh.
+- `require('diffstat').statusline()` returns `+12 -3 ?2` for the last refresh (`?2`: untracked files, whose lines are in `+12`).
 - `require('diffstat').get()` returns the full result.
 - `User DiffStatUpdated` fires after each refresh.
 

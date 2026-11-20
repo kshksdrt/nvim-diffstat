@@ -50,6 +50,45 @@ function M.parse_numstat(out: string): {FileStat}
    return files
 end
 
+-- Like core.bigFileThreshold: larger untracked files are reported as binary
+-- instead of being read on every refresh.
+local MAX_UNTRACKED_BYTES = 8 * 1024 * 1024
+
+-- What `git diff` would report for an untracked file once added: every line is
+-- an insertion, a NUL in the first 8000 bytes means binary, and a symlink is
+-- one line (its target).
+function M.count_untracked(root: string, path: string): FileStat
+   local f: FileStat = { path = path, added = 0, removed = 0, binary = false }
+   local st = vim.uv.fs_lstat(root .. "/" .. path)
+   if not st then
+      return f
+   elseif st.type == "link" then
+      f.added = 1
+      return f
+   elseif st.type ~= "file" then
+      return f
+   elseif st.size > MAX_UNTRACKED_BYTES then
+      f.binary = true
+      return f
+   end
+   local fh = io.open(root .. "/" .. path, "rb")
+   if not fh then
+      return f
+   end
+   local data = fh:read("*a") or ""
+   fh:close()
+   if data:sub(1, 8000):find("\0", 1, true) then
+      f.binary = true
+      return f
+   end
+   local _, n = data:gsub("\n", "")
+   if #data > 0 and data:sub(-1) ~= "\n" then
+      n = n + 1
+   end
+   f.added = math.floor(n)
+   return f
+end
+
 -- cb runs on the main loop: (stat, nil) on success, (nil, nil) outside a
 -- repository, (nil, message) when git fails.
 function M.stat(dir: string, args: {string}, with_untracked: boolean, cb: function(Stat, string))
@@ -84,7 +123,7 @@ function M.stat(dir: string, args: {string}, with_untracked: boolean, cb: functi
          untracked = {},
       }
       local list_untracked = default and with_untracked
-      local pending = list_untracked and 2 or 1
+      local pending = list_untracked and 3 or 2
       local err: string
 
       local function done()
@@ -95,13 +134,25 @@ function M.stat(dir: string, args: {string}, with_untracked: boolean, cb: functi
          if err then
             return finish(nil, err)
          end
-         for _, f in ipairs(stat.files) do
-            stat.added = stat.added + f.added
-            stat.removed = stat.removed + f.removed
+         for _, list in ipairs({ stat.files, stat.untracked }) do
+            for _, f in ipairs(list) do
+               stat.added = stat.added + f.added
+               stat.removed = stat.removed + f.removed
+            end
          end
          stat.updated_at = os.time()
          finish(stat, nil)
       end
+
+      -- Empty when detached; before the first commit it names the unborn branch.
+      git(root, { "branch", "--show-current" }, function(r: vim.SystemCompleted)
+         local name = r.code == 0 and vim.trim(r.stdout or "") or ""
+         if name == "" and head then
+            name = head:sub(1, 7)
+         end
+         stat.branch = name ~= "" and name or nil
+         done()
+      end)
 
       git(root, diff, function(r: vim.SystemCompleted)
          if r.code ~= 0 then
@@ -118,7 +169,9 @@ function M.stat(dir: string, args: {string}, with_untracked: boolean, cb: functi
       if list_untracked then
          git(root, { "ls-files", "--others", "--exclude-standard", "-z" }, function(r: vim.SystemCompleted)
             if r.code == 0 then
-               stat.untracked = vim.split(r.stdout or "", "\0", { plain = true, trimempty = true })
+               for _, path in ipairs(vim.split(r.stdout or "", "\0", { plain = true, trimempty = true })) do
+                  stat.untracked[#stat.untracked + 1] = M.count_untracked(root, path)
+               end
             end
             done()
          end)

@@ -62,9 +62,9 @@ end)
 test('render: rows, bar scaling, summary', function()
   local stat = {
     args = {},
-    added = 101,
+    added = 103,
     removed = 50,
-    untracked = { 'new.txt' },
+    untracked = { { path = 'new.txt', added = 2, removed = 0, binary = false } },
     files = {
       { path = 'big.lua', added = 100, removed = 50, binary = false },
       { path = 'small.lua', added = 1, removed = 0, binary = false },
@@ -76,12 +76,12 @@ test('render: rows, bar scaling, summary', function()
   eq(' big.lua   | 150 ' .. ('+'):rep(15) .. ('-'):rep(8), lines[1], 'scaled row')
   eq(' small.lua |   1 +', lines[2], 'smallest change keeps one mark')
   eq(' img.png   | Bin', lines[3], 'binary row')
-  eq(' 3 files changed, 101 insertions(+), 50 deletions(-)', lines[4], 'summary')
-  eq({ '', ' Untracked (not counted above):', '   new.txt' }, { lines[5], lines[6], lines[7] }, 'untracked')
+  eq({ '', ' Untracked:', ' new.txt   |   2 +' }, { lines[4], lines[5], lines[6] }, 'untracked row on the same scale')
+  eq(' 4 files changed (1 untracked), 103 insertions(+), 50 deletions(-)', lines[7], 'summary')
   eq({ row = 0, col = 17, end_col = 32, group = 'DiffStatAdded' }, spans[1], 'added span')
   eq({ row = 0, col = 32, end_col = 40, group = 'DiffStatRemoved' }, spans[2], 'removed span')
   for _, l in ipairs(lines) do
-    assert(vim.fn.strdisplaywidth(l) <= 52, 'row too wide: ' .. l)
+    assert(vim.fn.strdisplaywidth(l) <= 68, 'row too wide: ' .. l)
   end
 end)
 
@@ -95,6 +95,22 @@ test('render: long names are shortened from the left', function()
   assert(vim.fn.strdisplaywidth(lines[1]) <= 40, lines[1])
 end)
 
+test('count_untracked: lines, no final newline, empty, binary, symlink', function()
+  local d = tmp .. '/files'
+  vim.fn.mkdir(d, 'p')
+  sh(d, [[printf 'a\nb\n' > two && printf 'a\nb' > open && : > empty && printf 'a\0b\n' > bin && ln -s two link]])
+  local function c(p)
+    local f = git.count_untracked(d, p)
+    return { f.added, f.removed, f.binary }
+  end
+  eq({ 2, 0, false }, c 'two')
+  eq({ 2, 0, false }, c 'open', 'unterminated last line counts')
+  eq({ 0, 0, false }, c 'empty')
+  eq({ 0, 0, true }, c 'bin')
+  eq({ 1, 0, false }, c 'link')
+  eq({ 0, 0, false }, c 'missing')
+end)
+
 local r = repo 'main'
 sh(r, 'printf "a\\nb\\nc\\n" > f.txt && git add f.txt && git commit -qm init')
 
@@ -104,6 +120,12 @@ test('refresh: clean repo has no changes and an empty statusline', function()
   eq(vim.fs.normalize(vim.uv.fs_realpath(r)), stat.root, 'root')
   eq(0, #stat.files)
   eq('', diffstat.statusline())
+  sh(r, 'git branch -m trunk')
+  eq('trunk', (refresh_in(r)).branch, 'branch')
+  sh(r, 'git checkout -q --detach')
+  local detached = refresh_in(r)
+  eq(7, #detached.branch, 'detached shows a short id')
+  sh(r, 'git checkout -q trunk')
 end)
 
 test('refresh: staged + unstaged + untracked, and the update event', function()
@@ -117,11 +139,11 @@ test('refresh: staged + unstaged + untracked, and the update event', function()
     end,
   })
   local stat = refresh_in(r)
-  eq(3, stat.added, 'added')
+  eq(4, stat.added, 'added, including the untracked line')
   eq(1, stat.removed, 'removed')
-  eq({ 'untracked.txt' }, stat.untracked)
+  eq({ { path = 'untracked.txt', added = 1, removed = 0, binary = false } }, stat.untracked)
   eq(stat, diffstat.get(), 'get() returns the last result')
-  eq('+3 -1 ?1', diffstat.statusline())
+  eq('+4 -1 ?1', diffstat.statusline())
   eq(stat.added, seen and seen.added, 'event data')
 end)
 
@@ -146,8 +168,9 @@ test('refresh: repository without commits', function()
   sh(u, 'printf "1\\n2\\n" > a && git add a && echo z > b')
   local stat, err = refresh_in(u)
   eq(nil, err)
-  eq(2, stat.added)
-  eq({ 'b' }, stat.untracked)
+  eq(3, stat.added)
+  eq('b', stat.untracked[1].path)
+  eq(1, stat.untracked[1].added)
 end)
 
 test('refresh: outside a repository clears the result', function()
@@ -201,8 +224,10 @@ test(':GitDiffStat opens a float; q closes it', function()
     return #vim.api.nvim_list_wins() > wins
   end), 'no float opened')
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-  assert(lines[#lines - 1] == ' Untracked (not counted above):', vim.inspect(lines))
+  assert(lines[#lines - 2] == ' Untracked:', vim.inspect(lines))
   eq('diffstat', vim.bo.filetype)
+  local title = vim.api.nvim_win_get_config(0).title
+  assert(vim.inspect(title):match 'trunk · HEAD', vim.inspect(title))
   vim.api.nvim_feedkeys('q', 'x', false)
   eq(wins, #vim.api.nvim_list_wins(), 'float closed')
 end)

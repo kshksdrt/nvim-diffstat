@@ -24,9 +24,11 @@ current directory for special and unnamed buffers), resolved again on every
 refresh. There is a single stored result, not one per repository.
 
 By default the working tree is compared to HEAD (staged and unstaged changes
-together), and untracked files are listed separately because `git diff`
-ignores them. Before the first commit, the comparison is against the empty
-tree.
+together). Untracked files, which `git diff` ignores, are counted as if they
+were added: every line is an insertion, and they are included in the totals.
+Like git, a file with a NUL byte in its first 8000 bytes is binary; files
+over 8 MiB are also reported as binary rather than read on every refresh.
+Before the first commit, the comparison is against the empty tree.
 
 Background refreshes run git with GIT_OPTIONAL_LOCKS=0, so they never hold
 index.lock while you run git yourself.
@@ -41,7 +43,7 @@ The command works without setup. The background refresh starts with:
       interval_ms = 10000,
       -- Default `git diff` arguments. Empty means HEAD vs the working tree.
       args = {},
-      -- List untracked files when comparing against HEAD.
+      -- Count untracked files when comparing against HEAD.
       untracked = true,
       -- Statusline text for a |diffstat-stat|. The default returns
       -- "+12 -3", plus " ?2" when there are untracked files, or "".
@@ -65,7 +67,9 @@ Calling setup() again replaces the configuration and restarts the timer.
     :GitDiffStat --staged        " staged changes only
     :GitDiffStat main...HEAD     " the whole branch against main
 <
-                        Untracked files are listed only without [args].
+                        Untracked files are counted only without [args].
+                        The border title shows the branch (a short commit
+                        id when detached) and the comparison.
 
 :GitDiffStat! [args]    Refresh without the float. Errors still show up
                         as notifications.
@@ -114,11 +118,13 @@ stop()                                                       *diffstat.stop()*
 A stat is a table with these fields:
 
     root        string      Repository top level.
+    branch      string|nil  Current branch, or a short commit id when
+                            detached.
     args        string[]    `git diff` arguments used. Empty means HEAD.
     files       FileStat[]  One per changed file.
-    added       integer     Total lines added.
+    added       integer     Total lines added, untracked files included.
     removed     integer     Total lines removed.
-    untracked   string[]    Untracked paths. Empty when args were given.
+    untracked   FileStat[]  Untracked files. Empty when args were given.
     updated_at  integer     os.time() when the result landed.
 
 FileStat fields: `path`, `old_path` (renames and copies only), `added`,

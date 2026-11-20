@@ -129,8 +129,14 @@ global record vim
       lines: integer
    end
 
+   record FsStat
+      type: string
+      size: integer
+   end
+
    record uv
       new_timer: function(): Timer
+      fs_lstat: function(path: string): FsStat
    end
 
    g: {string:any}

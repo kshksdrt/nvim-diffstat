@@ -1,5 +1,6 @@
 local types = require("diffstat.types")
 local type Stat = types.Stat
+local type FileStat = types.FileStat
 local type FloatConfig = types.FloatConfig
 
 local record M
@@ -48,11 +49,19 @@ function M.render(stat: Stat, max_width: integer): {string}, {Span}
    local lines: {string} = {}
    local spans: {Span} = {}
 
-   local names: {string} = {}
+   -- Tracked and untracked rows share the columns and the bar scale.
+   local all: {FileStat} = {}
+   for _, list in ipairs({ stat.files, stat.untracked }) do
+      for _, f in ipairs(list) do
+         all[#all + 1] = f
+      end
+   end
+
+   local names: {FileStat:string} = {}
    local name_w, count_w, max_change = 0, 3, 0
-   for i, f in ipairs(stat.files) do
-      names[i] = f.old_path and (f.old_path .. " => " .. f.path) or f.path
-      name_w = math.max(name_w, width(names[i]))
+   for _, f in ipairs(all) do
+      names[f] = f.old_path and (f.old_path .. " => " .. f.path) or f.path
+      name_w = math.max(name_w, width(names[f]))
       count_w = math.max(count_w, #tostring(f.added + f.removed))
       max_change = math.max(max_change, f.added + f.removed)
    end
@@ -61,33 +70,49 @@ function M.render(stat: Stat, max_width: integer): {string}, {Span}
    name_w = math.max(4, math.min(name_w, max_width - fixed - MIN_BAR))
    local bar_w = math.max(1, max_width - fixed - name_w)
 
-   for i, f in ipairs(stat.files) do
-      local name = fit(names[i], name_w)
+   local function row(f: FileStat)
+      local name = fit(names[f], name_w)
       local prefix = " " .. name .. string.rep(" ", name_w - width(name)) .. " | "
       if f.binary then
          lines[#lines + 1] = prefix .. "Bin"
-      else
-         local total = f.added + f.removed
-         local marks = scale(total, max_change, bar_w)
-         local plus = total > 0 and math.floor(marks * f.added / total + 0.5) or 0
-         -- Keep at least one mark for each side that changed.
-         if f.added > 0 and plus == 0 then
-            plus = 1
-         elseif f.removed > 0 and plus == marks then
-            plus = marks - 1
-         end
-         local count = tostring(total)
-         prefix = prefix .. string.rep(" ", count_w - #count) .. count .. " "
-         local row = #lines
-         local c = #prefix
-         spans[#spans + 1] = { row = row, col = c, end_col = c + plus, group = "DiffStatAdded" }
-         spans[#spans + 1] = { row = row, col = c + plus, end_col = c + marks, group = "DiffStatRemoved" }
-         lines[#lines + 1] = prefix .. string.rep("+", plus) .. string.rep("-", marks - plus)
+         return
+      end
+      local total = f.added + f.removed
+      local marks = scale(total, max_change, bar_w)
+      local plus = total > 0 and math.floor(marks * f.added / total + 0.5) or 0
+      -- Keep at least one mark for each side that changed.
+      if f.added > 0 and plus == 0 then
+         plus = 1
+      elseif f.removed > 0 and plus == marks then
+         plus = marks - 1
+      end
+      local count = tostring(total)
+      prefix = prefix .. string.rep(" ", count_w - #count) .. count .. " "
+      local r = #lines
+      local c = #prefix
+      spans[#spans + 1] = { row = r, col = c, end_col = c + plus, group = "DiffStatAdded" }
+      spans[#spans + 1] = { row = r, col = c + plus, end_col = c + marks, group = "DiffStatRemoved" }
+      lines[#lines + 1] = prefix .. string.rep("+", plus) .. string.rep("-", marks - plus)
+   end
+
+   for _, f in ipairs(stat.files) do
+      row(f)
+   end
+   if #stat.untracked > 0 then
+      if #lines > 0 then
+         lines[#lines + 1] = ""
+      end
+      lines[#lines + 1] = " Untracked:"
+      for _, f in ipairs(stat.untracked) do
+         row(f)
       end
    end
 
-   if #stat.files > 0 then
-      local summary = " " .. plural(#stat.files, "file changed", "files changed")
+   if #all > 0 then
+      local summary = " " .. plural(#all, "file changed", "files changed")
+      if #stat.untracked > 0 then
+         summary = summary .. " (" .. tostring(#stat.untracked) .. " untracked)"
+      end
       if stat.added > 0 then
          summary = summary .. ", " .. plural(stat.added, "insertion(+)", "insertions(+)")
       end
@@ -95,16 +120,6 @@ function M.render(stat: Stat, max_width: integer): {string}, {Span}
          summary = summary .. ", " .. plural(stat.removed, "deletion(-)", "deletions(-)")
       end
       lines[#lines + 1] = summary
-   end
-
-   if #stat.untracked > 0 then
-      if #lines > 0 then
-         lines[#lines + 1] = ""
-      end
-      lines[#lines + 1] = " Untracked (not counted above):"
-      for _, path in ipairs(stat.untracked) do
-         lines[#lines + 1] = "   " .. path
-      end
    end
 
    return lines, spans
@@ -137,6 +152,9 @@ function M.open(stat: Stat, cfg: FloatConfig)
    vim.api.nvim_set_option_value("filetype", "diffstat", { buf = buf })
 
    local label = #stat.args > 0 and table.concat(stat.args, " ") or "HEAD"
+   if stat.branch then
+      label = stat.branch .. " · " .. label
+   end
    local win = vim.api.nvim_open_win(buf, true, {
       relative = "editor",
       width = w,

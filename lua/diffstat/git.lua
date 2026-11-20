@@ -53,6 +53,45 @@ end
 
 
 
+local MAX_UNTRACKED_BYTES = 8 * 1024 * 1024
+
+
+
+
+function M.count_untracked(root, path)
+   local f = { path = path, added = 0, removed = 0, binary = false }
+   local st = vim.uv.fs_lstat(root .. "/" .. path)
+   if not st then
+      return f
+   elseif st.type == "link" then
+      f.added = 1
+      return f
+   elseif st.type ~= "file" then
+      return f
+   elseif st.size > MAX_UNTRACKED_BYTES then
+      f.binary = true
+      return f
+   end
+   local fh = io.open(root .. "/" .. path, "rb")
+   if not fh then
+      return f
+   end
+   local data = fh:read("*a") or ""
+   fh:close()
+   if data:sub(1, 8000):find("\0", 1, true) then
+      f.binary = true
+      return f
+   end
+   local _, n = data:gsub("\n", "")
+   if #data > 0 and data:sub(-1) ~= "\n" then
+      n = n + 1
+   end
+   f.added = math.floor(n)
+   return f
+end
+
+
+
 function M.stat(dir, args, with_untracked, cb)
    local function finish(stat, err)
       vim.schedule(function() cb(stat, err) end)
@@ -85,7 +124,7 @@ function M.stat(dir, args, with_untracked, cb)
          untracked = {},
       }
       local list_untracked = default and with_untracked
-      local pending = list_untracked and 2 or 1
+      local pending = list_untracked and 3 or 2
       local err
 
       local function done()
@@ -96,13 +135,25 @@ function M.stat(dir, args, with_untracked, cb)
          if err then
             return finish(nil, err)
          end
-         for _, f in ipairs(stat.files) do
-            stat.added = stat.added + f.added
-            stat.removed = stat.removed + f.removed
+         for _, list in ipairs({ stat.files, stat.untracked }) do
+            for _, f in ipairs(list) do
+               stat.added = stat.added + f.added
+               stat.removed = stat.removed + f.removed
+            end
          end
          stat.updated_at = os.time()
          finish(stat, nil)
       end
+
+
+      git(root, { "branch", "--show-current" }, function(r)
+         local name = r.code == 0 and vim.trim(r.stdout or "") or ""
+         if name == "" and head then
+            name = head:sub(1, 7)
+         end
+         stat.branch = name ~= "" and name or nil
+         done()
+      end)
 
       git(root, diff, function(r)
          if r.code ~= 0 then
@@ -119,7 +170,9 @@ function M.stat(dir, args, with_untracked, cb)
       if list_untracked then
          git(root, { "ls-files", "--others", "--exclude-standard", "-z" }, function(r)
             if r.code == 0 then
-               stat.untracked = vim.split(r.stdout or "", "\0", { plain = true, trimempty = true })
+               for _, path in ipairs(vim.split(r.stdout or "", "\0", { plain = true, trimempty = true })) do
+                  stat.untracked[#stat.untracked + 1] = M.count_untracked(root, path)
+               end
             end
             done()
          end)
