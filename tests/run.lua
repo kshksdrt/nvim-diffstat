@@ -232,6 +232,36 @@ test(':GitDiffStat opens a float; q closes it', function()
   eq(wins, #vim.api.nvim_list_wins(), 'float closed')
 end)
 
+test(':GitDiffStatCompare: base...target in a float, stored result untouched', function()
+  local c = repo 'compare'
+  sh(c, 'git checkout -q -b trunk && echo a > a && git add a && git commit -qm a')
+  sh(c, 'git checkout -q -b feature && printf "1\\n2\\n" > f && git add f && git commit -qm f')
+  -- A trunk-only commit, which base...target leaves out.
+  sh(c, 'git checkout -q trunk && echo t > t && git add t && git commit -qm t')
+  sh(c, 'git update-ref refs/remotes/origin/feature feature && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/feature')
+  vim.cmd.cd(c)
+
+  local refs = diffstat.refs()
+  table.sort(refs)
+  eq({ 'feature', 'origin/feature', 'trunk' }, refs, 'refs skip origin/HEAD')
+  eq({ 'feature' }, vim.fn.getcompletion('GitDiffStatCompare fe', 'cmdline'), 'first arg')
+  eq({ 'origin/feature' }, vim.fn.getcompletion('GitDiffStatCompare trunk or', 'cmdline'), 'second arg')
+  eq({}, vim.fn.getcompletion('GitDiffStatCompare trunk feature ', 'cmdline'), 'no third arg')
+
+  local before = diffstat.get()
+  local wins = #vim.api.nvim_list_wins()
+  vim.cmd 'GitDiffStatCompare trunk origin/feature'
+  assert(vim.wait(5000, function()
+    return #vim.api.nvim_list_wins() > wins
+  end), 'no float opened')
+  local title = vim.inspect(vim.api.nvim_win_get_config(0).title)
+  assert(title:match 'Git Diff Stat · trunk%.%.%.origin/feature ', title)
+  local text = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
+  assert(text:match ' f ' and not text:match ' t ', text)
+  vim.api.nvim_feedkeys('q', 'x', false)
+  eq(before, diffstat.get(), 'stored result unchanged')
+end)
+
 vim.fn.delete(tmp, 'rf')
 print(('%d/%d passed'):format(total - failures, total))
 os.exit(failures == 0 and 0 or 1)

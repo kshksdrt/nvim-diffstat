@@ -5,7 +5,7 @@ CONTENTS                                                            *diffstat*
 
   1. Overview ..................................... |diffstat-overview|
   2. Setup ........................................ |diffstat-setup|
-  3. Command ...................................... |:GitDiffStat|
+  3. Commands ..................................... |:GitDiffStat|
   4. Lua API ...................................... |diffstat-api|
   5. Statusline ................................... |diffstat-statusline|
   6. Event ........................................ |DiffStatUpdated|
@@ -58,7 +58,7 @@ The command works without setup. The background refresh starts with:
 Calling setup() again replaces the configuration and restarts the timer.
 
 ==============================================================================
-3. COMMAND                                                      *:GitDiffStat*
+3. COMMANDS                                                     *:GitDiffStat*
 
 :GitDiffStat [args]     Refresh, then show the result in a float like
                         `git diff --stat`. `q` or <Esc> closes it. [args]
@@ -74,6 +74,19 @@ Calling setup() again replaces the configuration and restarts the timer.
 :GitDiffStat! [args]    Refresh without the float. Errors still show up
                         as notifications.
 
+                                                         *:GitDiffStatCompare*
+:GitDiffStatCompare {base} [target]
+                        Show `git diff --stat base...target` in a float:
+                        the changes on [target] (default HEAD) since it
+                        branched off {base}, ignoring commits made on
+                        {base} since then. Both are any revision; <Tab>
+                        completes local branches, remote branches and
+                        tags. The result is not stored, so the
+                        statusline keeps showing the working tree.
+>vim
+    :GitDiffStatCompare main             " this branch against main
+    :GitDiffStatCompare origin/main feature
+<
 The float's buffer has 'filetype' "diffstat". The bar is drawn with the
 highlight groups `DiffStatAdded` and `DiffStatRemoved`, which link to `Added`
 and `Removed` by default.
@@ -108,6 +121,14 @@ refresh({args}, {cb})                                     *diffstat.refresh()*
 
 show({args})                                                 *diffstat.show()*
     The Lua version of |:GitDiffStat|.
+
+compare({base}, {target})                                 *diffstat.compare()*
+    The Lua version of |:GitDiffStatCompare|. {target} defaults to "HEAD".
+
+refs()                                                       *diffstat.refs()*
+    Returns the names of local branches, remote branches and tags (without
+    symbolic refs such as origin/HEAD), as |:GitDiffStatCompare| completes
+    them. Runs git synchronously; empty outside a repository.
 
 start()                                                     *diffstat.start()*
 stop()                                                       *diffstat.stop()*

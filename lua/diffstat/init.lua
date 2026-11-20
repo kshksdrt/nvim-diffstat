@@ -105,6 +105,40 @@ function M.show(args)
    end)
 end
 
+
+
+function M.compare(base, target)
+   target = (target and target ~= "") and target or "HEAD"
+   git.stat(start_dir(), { base .. "..." .. target }, false, function(stat, err)
+      if report(stat, err) then
+
+         stat.branch = nil
+         view.open(stat, config.float)
+      end
+   end)
+end
+
+
+function M.refs()
+   local r = vim.system({
+      "git", "-C", start_dir(), "for-each-ref",
+      "--format=%(refname:short)\t%(symref)",
+      "refs/heads", "refs/remotes", "refs/tags",
+   }, { text = true }):wait()
+   local refs = {}
+   if r.code ~= 0 then
+      return refs
+   end
+   for _, line in ipairs(vim.split(r.stdout or "", "\n", { trimempty = true })) do
+      local name, symref = line:match("^([^\t]*)\t(.*)$")
+
+      if name and symref == "" then
+         refs[#refs + 1] = name
+      end
+   end
+   return refs
+end
+
 function M.refresh_verbose(args)
    M.refresh(args, function(stat, err)
       report(stat, err)

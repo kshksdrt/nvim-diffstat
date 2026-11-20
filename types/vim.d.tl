@@ -18,6 +18,7 @@ global record vim
    record SystemObj
       pid: integer
       kill: function(self, signal: integer | string)
+      wait: function(self, timeout?: integer): SystemCompleted
    end
 
    record SplitOpts
@@ -52,6 +53,7 @@ global record vim
    record CommandOpts
       nargs: string
       bang: boolean
+      complete: function(lead: string, line: string, pos: integer): {string}
       desc: string
    end
 
@@ -143,6 +145,7 @@ global record vim
 
    notify: function(msg: string, level?: integer, opts?: {string:any})
    schedule: function(fn: function())
+   startswith: function(s: string, prefix: string): boolean
    split: function(s: string, sep: string, opts?: SplitOpts): {string}
    system: function(cmd: {string}, opts?: SystemOpts, on_exit?: function(SystemCompleted)): SystemObj
    tbl_deep_extend: function<T>(behavior: string, a: T, b: T): T

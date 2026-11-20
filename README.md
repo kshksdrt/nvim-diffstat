@@ -15,6 +15,7 @@ Requires Neovim 0.10+.
 
 - `:GitDiffStat [args]` shows the stat in a float. `args` replace `HEAD`, e.g. `--staged`, `main...HEAD`.
 - `:GitDiffStat!` refreshes without the float.
+- `:GitDiffStatCompare {base} [target]` shows `base...target` (what `target`, default `HEAD`, changed since it branched off `base`). Completes local and remote branches and tags. `require('diffstat').compare(base, target)` from Lua.
 - `require('diffstat').statusline()` returns `+12 -3 ?2` for the last refresh (`?2`: untracked files, whose lines are in `+12`).
 - `require('diffstat').get()` returns the full result.
 - `User DiffStatUpdated` fires after each refresh.
